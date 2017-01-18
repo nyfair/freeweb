@@ -1,0 +1,19 @@
+#!python3
+
+import os
+import sys
+import zipfile
+
+arc = zipfile.ZipFile(sys.argv[1])
+for file in arc.namelist():
+	utf8name = file.encode('cp437').decode('shift-jis' if len(sys.argv) < 3 else 'shift-jis', 'ignore')
+	print(utf8name)
+	pathname = os.path.dirname(utf8name)
+	if not os.path.exists(pathname) and pathname != '':
+		os.makedirs(pathname)
+	data = arc.read(file)
+	if not os.path.exists(utf8name):
+		out = open(utf8name, 'wb')
+		out.write(data)
+		out.close()
+arc.close()
