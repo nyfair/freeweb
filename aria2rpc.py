@@ -1,3 +1,5 @@
+#!python3
+
 import json, sys, os
 from urllib import request
 from argparse import ArgumentParser
