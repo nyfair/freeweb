@@ -1,6 +1,6 @@
 #!python3
 
-import json, sys, os
+import json
 from urllib import request
 from argparse import ArgumentParser
 
@@ -8,7 +8,7 @@ parser = ArgumentParser()
 parser.add_argument('-c', '--cookie', help='use cookies', type=str, default='', metavar='COOKIES', dest='cookies')
 parser.add_argument('-o', '--output', help='output name', type=str, default='', metavar='NAME', dest='output')
 parser.add_argument('-r', '--referer', help='referer', default='', type=str, metavar='URL', dest='referer')
-parser.add_argument('-R', '--rpc', help='aria2 rpc', type=str, default='http://127.0.0.1:6800/jsonrpc', metavar='URL', dest='rpc')
+parser.add_argument('-R', '--rpc', help='aria2 rpc', type=str, default='http://localhost:6800/jsonrpc', metavar='URL', dest='rpc')
 parser.add_argument('URIs', nargs='+', help='URIs', type=str, default='', metavar='URI')
 opts = parser.parse_args()
 jsondict = {'jsonrpc':'2.0', 'id':'aria2rpc', 'method':'aria2.addUri', 'params':[opts.URIs]}
