@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+
+import hashlib
+import json
+import os
+import sys
+from urllib import parse, request
+
+BDP_API = 'http://api.usmusic.cn/'
+ARIA2_RPC = 'http://localhost:6800/jsonrpc'
+PRESET_OPTS = { 'continue': 'true', 'max-connection-per-server': 16, 'split': 16, 'min-split-size': '1M',
+								'user-agent': 'netdisk;5.5.2.0;PC;PC-Windows;10.0.14393;WindowsBaiduNetdisk',
+								'referer': 'http://pan.baidu.com/disk/home'}
+
+def help():
+	print('Input file/directory ID to download a file or enter specify directory')
+	print('Split file IDs with whitespace to download multi files')
+	print('Use * to download all files in current directory')
+	print('Use b to return to previous directory')
+	print('Use r to enter root directory')
+	print('Use f to force refresh current directory, otherwise we will read the structure from cache')
+	print('Use x to exit')
+	print('To download shared links, use "bdp <link> [password]", <link> can be http://pan.baidu.com/s/1xxOOO00 or simply 1xxOOO00,"bdp 链接: <link> [密码: [password]]" is also supported.')
+
+def download(urls, fname):
+	jsondict = {'jsonrpc':'2.0', 'id':'aria2rpc', 'method':'aria2.addUri', 'params':[urls]}
+	aria2opts = PRESET_OPTS
+	aria2opts['out'] = fname
+	jsondict['params'].append(aria2opts)
+	jsonreq = json.dumps(jsondict).encode('utf-8')
+	request.urlopen(ARIA2_RPC, jsonreq)
+
+def urlencode(m):
+	raw = ''
+	for k, v in m.items():
+		raw += '%s=%s&' % (k, parse.quote_plus(v) if type(v) == str else parse.quote_plus(json.dumps(v)))
+	return raw[:-1]
+
+def rest(api, query, payload = None):
+	data = None if payload is None else urlencode(payload).encode('utf-8')
+	resp = request.urlopen('%s%s?%s' % (BDP_API, api, urlencode(query)), data)
+	return json.load(resp)
+
+def cd(path, cache = True):
+	if cache and path in datas:
+		files = datas[path]
+	else:
+		if uk is None:
+			files = rest('sharefiles', {'token':token, 'path':path})['list']
+		else:
+			files = rest('filelist', {'token':token, 'uk':uk, 'path':path})['list']
+		datas[path] = files
+	for i, f in enumerate(files):
+		print('%d\t%s\t%s' % (i+1, f['server_filename'], 'Directory' if f['isdir'] == 1 else f['size']))
+	return files
+
+def fetch(files):
+	if uk is None:
+		f = list(map(lambda x:x['path'], files))
+		links = rest('sharelinks', {'token':token}, {'filelist':f})['links']
+	else:
+		links = rest('filelinks', {'token':token, 'uk':uk}, {'files':files})['links']
+	for fname in links.keys():
+		download(links[fname], fname)
+		print('Start download ' + fname)
+
+def login():
+	try:
+		name = os.environ['BDP_NAME']
+		password = os.environ['BDP_PASSWORD']
+	except KeyError:
+		name = input('name:')
+		password = input('password:')
+	m = hashlib.md5()
+	m.update(password.encode())
+	token = rest('login', {'security':'md5'}, {'name':name, 'password':m.hexdigest()})['token']
+	user = rest('userlist', {'token':token})['userlist'][0]
+	return token, user['Uk']
+
+def step(cmd, cur_path = '/'):
+	if cmd == 'x':
+		sys.exit(0)
+	elif cmd == 'f':
+		cd(cur_path, False)
+	elif cmd == 'r':
+		cd(cur_path)
+	elif cmd == 'b':
+		cur_path = cur_path[:cur_path.rfind('/')]
+		if cur_path == '':
+			cur_path = '/'
+		cd(cur_path)
+	elif cmd.isdigit():
+		f = datas[cur_path][int(cmd)-1]
+		if f['isdir'] == 1:
+			cur_path = f['path']
+			cd(cur_path)
+		else:
+			fetch([f])
+	elif cmd == '*':
+		files = list(filter(lambda f:f['isdir'] == 0, datas[cur_path]))
+		fetch(files)
+	elif cmd.find(' ') > 0:
+		files = []
+		for i in cmd.split(' '):
+			if i.isdigit():
+				f = datas[cur_path][int(i)-1]
+				if f['isdir'] == 0:
+					files.append(f)
+		fetch(files)
+	else:
+		help()
+	return cur_path
+
+def getBDLink(url):
+	if len(url) == 8:
+		return 'http://pan.baidu.com/s/' + url
+	else:
+		return 'http://' + url[url.index('pan.'):]
+
+datas = {}
+argc = len(sys.argv)
+try:
+	if argc == 1:
+		token, uk = login()
+	else:
+		longFlag = 2 if sys.argv[1].find('链接') > -1 and len(sys.argv[1]) < 8 else 1
+		q = {'shareurl': getBDLink(sys.argv[longFlag])}
+		if argc > longFlag * 2:
+			q['pass'] = sys.argv[-1][-4:]
+		token = rest('sharefiles', q)['token']
+		uk = None
+	cur_path = step('f')
+except Exception as e:
+	print(e)
+	sys.exit(1)
+while True:
+	cmd = input('input:')
+	try:
+		cur_path = step(cmd, cur_path)
+	except Exception as e:
+print(e)
