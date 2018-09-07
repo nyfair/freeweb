@@ -9,7 +9,7 @@ from urllib import parse, request
 BDP_API = 'http://api.usmusic.cn/'
 ARIA2_RPC = 'http://localhost:6800/jsonrpc'
 PRESET_OPTS = { 'continue': 'true', 'max-connection-per-server': 16, 'split': 16, 'min-split-size': '1M',
-								'user-agent': 'netdisk;5.5.2.0;PC;PC-Windows;10.0.14393;WindowsBaiduNetdisk',
+								'user-agent': 'netdisk;1.0',
 								'referer': 'http://pan.baidu.com/disk/home'}
 
 def help():
